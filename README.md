@@ -1,6 +1,6 @@
-# Python 命令行任务管理器
+# Python 任务管理器（CLI + FastAPI）
 
-这是一个使用 Python 编写的命令行任务管理器，用来练习 Python 基础和小型项目的模块化开发。
+这是一个使用 Python 编写的任务管理器，支持命令行操作和 HTTP API，用来练习 Python 基础、模块化开发和后端接口开发。两个入口共用业务逻辑和 JSON 存储。
 
 ## 已实现功能
 
@@ -23,7 +23,8 @@
 ## 项目结构
 
 ```text
-learn/
+python-task-cli/
+├── api.py              # FastAPI 入口、请求校验和 HTTP 响应
 ├── main.py             # 命令行入口和结果展示
 ├── models.py           # Task 数据模型
 ├── service.py          # 新增、查找、完成、删除、筛选等业务逻辑
@@ -35,7 +36,7 @@ learn/
 └── mai.py              # 早期菜单版程序，不是当前入口
 ```
 
-当前正式入口是 `main.py`。`mai.py` 是之前练习菜单式交互时留下的旧版本，可以保留作参考，也可以之后删除。
+命令行入口是 `main.py`，HTTP API 入口是 `api.py`。`mai.py` 是之前练习菜单式交互时留下的旧版本，可以保留作参考，也可以之后删除。
 
 ## 安装测试依赖
 
@@ -78,7 +79,7 @@ python main.py done 1
 
 ## 运行测试
 
-必须在项目根目录 `learn` 中执行：
+在项目根目录 `python-task-cli` 中，使用项目虚拟环境中的 Python 执行：
 
 ```powershell
 python -m pytest -q
@@ -131,3 +132,107 @@ storage.py
 - 文件读写和 JSON 持久化
 - 命令行参数解析
 - 自动化测试和基本项目文档
+
+## HTTP API 使用方法
+
+### 创建环境和安装依赖
+
+在项目根目录打开 PowerShell。首次使用时创建虚拟环境；已有 .venv 时跳过创建命令：
+
+```powershell
+python -m venv .venv
+```
+
+安装 API 和测试所需依赖：
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install fastapi "uvicorn[standard]" pytest
+```
+
+以下命令直接调用虚拟环境中的 Python，无须先激活环境。
+
+### 启动服务
+
+在项目根目录执行：
+
+```powershell
+.\.venv\Scripts\python.exe -m uvicorn api:app --reload
+```
+
+api:app 表示 api.py 中的 app 对象。--reload 用于开发期间在代码保存后自动重新加载。保持此终端运行，按 Ctrl + C 停止服务；其他命令可以在新终端执行。
+
+- [健康检查](http://127.0.0.1:8000/health)
+- [任务列表](http://127.0.0.1:8000/tasks)
+- [交互式接口文档](http://127.0.0.1:8000/docs)
+
+根路径 / 暂未定义，直接访问 http://127.0.0.1:8000/ 会返回 404。
+
+### 已实现接口
+
+| 方法 | 路径 | 功能 | 成功状态码 |
+| --- | --- | --- | --- |
+| GET | /health | 检查服务能否响应，返回 {"status":"running"} | 200 |
+| GET | /tasks | 返回全部任务，没有任务时返回 [] | 200 |
+| POST | /tasks | 创建任务并保存到 JSON 文件 | 201 |
+
+健康检查中的 running 是自定义响应数据，与 HTTP 状态码是两个独立概念。
+
+### 新增任务示例
+
+在 /docs 中展开 POST /tasks，点击 Try it out，填写请求体后点击 Execute：
+
+```json
+{
+  "title": "学习 FastAPI",
+  "priority": "high"
+}
+```
+
+title 必填；priority 可选，默认 medium，仅允许 low、medium、high。id 由服务端生成，done 默认为 false。
+
+成功响应示例（实际 ID 取决于已有任务）：
+
+```json
+{
+  "id": 1,
+  "title": "学习 FastAPI",
+  "done": false,
+  "priority": "high"
+}
+```
+
+每次执行 POST 都会实际新增并保存一条任务。之后调用 GET /tasks 查看结果。
+
+### 输入错误
+
+- 标题为空字符串或全是空格：返回 400，响应为 {"detail":"任务标题不能为空"}。
+- 缺少 title 或 priority 不在允许范围内：返回 422，由请求模型进行校验。
+
+### 数据存储和模块协作
+
+api.py 接收请求，使用 TaskCreate 校验创建参数，调用 service.py 处理业务，再调用 storage.py 读写文件，最后返回响应。
+
+tasks.json 使用相对路径，因此 CLI 和 API 都应从项目根目录启动，才能使用同一个数据文件。重启服务后，任务会重新从文件读取。
+
+当前存储实现遇到文件不存在时返回空列表；遇到无效 JSON 时打印提示并返回空列表。这不是完善的损坏恢复机制。当前文件存储也未处理并发写入，适用于本地学习，后续计划改用数据库。
+
+### 验证方式
+
+1. 调用 POST /tasks 新增任务，确认返回 201。
+2. 调用 GET /tasks，确认能查询到新增任务。
+3. 分别提交空白标题和非法优先级，确认返回 400 和 422。
+4. 停止并重新启动服务，确认新增任务仍存在。
+5. 在另一个终端执行已有测试：
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest -q
+```
+
+已有测试覆盖业务逻辑和存储；HTTP 接口目前采用手动验证，接口自动化测试待补充。以上步骤是验证方法，不代表每次修改后已自动执行。
+
+### 后续计划
+
+- 查询单个任务、修改和删除任务的 HTTP 接口
+- SQLite 数据库持久化
+- 接口自动化测试
+- Docker 启动方式
