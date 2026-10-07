@@ -70,3 +70,36 @@ def delete_task(
 def get_incomplete_tasks(tasks: list[Task]) -> list[Task]:
     """返回所有未完成任务。"""
     return [task for task in tasks if not task.done]
+
+
+def update_task(
+    tasks: list[Task],
+    task_id: int,
+    title: str | None = None,
+    priority: str | None = None,
+    done: bool | None = None,
+) -> Task | None:
+    task = find_task_by_id(tasks, task_id)
+
+    if task is None:
+        return None
+
+    if title is not None:
+        title = title.strip()
+        if title == "":
+            raise ValueError("任务标题不能为空")
+
+    if priority is not None:
+        if priority not in ("low", "medium", "high"):
+            raise ValueError("任务优先级不合法")
+
+    if title is not None:
+        task.title = title
+
+    if priority is not None:
+        task.priority = priority
+
+    if done is not None:
+        task.done = done
+
+    return task
