@@ -296,6 +296,45 @@ tasks.json 使用相对路径，因此 CLI 和 API 都应从项目根目录启�
 
 ### 后续计划
 
-- SQLite 数据库持久化
+- 将 SQLite 数据库接入任务 API（目前已完成独立 SQL 练习）
 - 接口自动化测试
 - Docker 启动方式
+
+## 第三天：SQLite 与 SQL 练习
+
+db_practice.py 是独立学习脚本，使用 Python 内置 sqlite3，不需要安装数据库服务。现有 CLI 和 HTTP API 仍使用 tasks.json，尚未切换为数据库存储。
+
+### 运行方式
+
+在项目根目录执行：
+
+```powershell
+.\.venv\Scripts\python.exe db_practice.py
+```
+
+数据库 practice.db 位于脚本所在目录，首次连接时自动创建，已加入 .gitignore。新克隆项目运行脚本会得到空表，不会自动恢复本地练习数据。
+
+脚本目前保留建表与查询，增删改和事务练习以注释形式保留。需要重做时只取消相应练习块的注释，包括配套的 commit；每次执行 INSERT 都会新增数据。CREATE TABLE IF NOT EXISTS 不会迁移已有表结构。
+
+### 学习内容
+
+- 表、行、列，以及整数主键。
+- NOT NULL、DEFAULT 和 CHECK 约束；NOT NULL 本身不拒绝空字符串。
+- INSERT 新增、SELECT 查询、UPDATE 修改、DELETE 删除。
+- WHERE 筛选、ORDER BY 排序、LIMIT 限制结果数量。
+- 使用 ? 占位符传参数，正确保存包含单引号的标题。
+- fetchone() 返回一行或 None；fetchall() 返回结果列表。
+- lastrowid 获取插入 ID，rowcount 查看受影响行数。
+- commit() 提交，rollback() 撤销当前事务中未提交的修改。
+
+### 事务练习
+
+脚本中的两个 INSERT 之间不提交。使用当前连接方式时，第二条优先级为 urgent 会违反 CHECK 约束；捕获 IntegrityError 后显式 rollback，第一条插入也被撤销。
+
+把第二条优先级设为 high，两条插入成功后统一 commit，任务数增加 2。提交后的修改不能通过后续 rollback 撤销。重新运行查询可以检查持久保存的结果。
+
+UPDATE 和 DELETE 应检查 WHERE 条件，省略条件会影响整张表。仅注释 commit 并不会阻止 UPDATE 执行，同一连接中的查询仍可能看到尚未提交的修改。
+
+### 验证记录与范围
+
+练习通过终端手动验证，包括查询、修改、删除、失败回滚和成功提交。原有 10 个 pytest 测试已通过；这些原有测试不代表新增 SQLite 练习已被自动化测试覆盖。
